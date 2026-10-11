@@ -2,27 +2,38 @@ import { backgroundAnsi, foregroundAnsi, isAppleTerminalSession, rgbColor } from
 import { theme } from "../theme/theme.ts";
 
 const CORAL = rgbColor(228, 138, 122);
-const BLUE = rgbColor(79, 142, 179);
 const YELLOW = rgbColor(234, 182, 93);
 const RESET = "\x1b[0m";
 
+type Color = typeof CORAL;
+
+const JET_COLORS: Record<string, Color> = {
+	B: rgbColor(160, 170, 182), // body
+	W: rgbColor(98, 110, 124), // wing
+	C: rgbColor(90, 190, 230), // canopy
+	F: rgbColor(240, 140, 60), // afterburner
+};
+
 /**
- * The pi logo: 4 cells wide and 2 lines tall. Each cell shows two square pixels with half blocks:
- *
- *   coral coral coral .
- *   blue  .     coral .
- *   blue  blue  .     yellow
- *   blue  .     .     yellow
- *
- * The brand colors stay fixed across themes; they follow the terminal's color mode.
+ * Pixel-art fighter jet, nose to the right. Two pixel rows share one terminal line via half blocks.
+ * The colors stay fixed across themes; they follow the terminal's color mode.
  */
+const JET = ["BB..........", ".BBBBBBCC...", "FBBBBBBBBBBB", "....WWWW...."];
+
 export function piLogoLines(): [string, string] {
 	const mode = theme.getColorMode();
-	const fg = (color: typeof CORAL) => foregroundAnsi(color, mode);
-	// The fourth cell of the top line is empty, so it is padded to the same width as the bottom line.
-	const top = `${fg(CORAL)}${backgroundAnsi(BLUE, mode)}▀${RESET}${fg(CORAL)}▀█${RESET} `;
-	const bottom = `${fg(BLUE)}█▀${RESET} ${fg(YELLOW)}█${RESET}`;
-	return [top, bottom];
+	const line = (upper: string, lower: string) =>
+		[...upper]
+			.map((key, i) => {
+				const top = JET_COLORS[key];
+				const bottom = JET_COLORS[lower[i]];
+				if (!top && !bottom) return " ";
+				if (!top) return `${foregroundAnsi(bottom, mode)}▄${RESET}`;
+				if (!bottom || top === bottom) return `${foregroundAnsi(top, mode)}${top === bottom ? "█" : "▀"}${RESET}`;
+				return `${foregroundAnsi(top, mode)}${backgroundAnsi(bottom, mode)}▀${RESET}`;
+			})
+			.join("");
+	return [line(JET[0], JET[1]), line(JET[2], JET[3])];
 }
 
 /**
