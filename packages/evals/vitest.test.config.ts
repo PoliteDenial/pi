@@ -6,6 +6,7 @@ export default mergeConfig(
 	defineConfig({
 		test: {
 			include: ["test/**/*.test.ts"],
+			setupFiles: ["../coding-agent/test/setup-builtin-providers.ts"],
 		},
 		resolve: {
 			alias: [{ find: /^@earendil-works\/pi-coding-agent$/, replacement: workspaceSourcePaths.codingAgentIndex }],

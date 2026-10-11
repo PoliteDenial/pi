@@ -40,6 +40,10 @@
               "path": "security.md"
             },
             {
+              "title": "Network Egress",
+              "path": "egress.md"
+            },
+            {
               "title": "Isolate Pi",
               "path": "containerization.md"
             },

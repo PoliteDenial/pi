@@ -37,7 +37,12 @@ import { hasTrustRequiringProjectResources, ProjectTrustStore } from "./core/tru
 import { spawnProcess, spawnProcessSync, waitForChildProcess } from "./utils/child-process.ts";
 import { canonicalizePath, getCwdRelativePath } from "./utils/paths.ts";
 import { getPiUserAgent } from "./utils/pi-user-agent.ts";
-import { formatVersionCheckError, getLatestPiRelease, isNewerPackageVersion } from "./utils/version-check.ts";
+import {
+	formatVersionCheckError,
+	getLatestPiRelease,
+	isNewerPackageVersion,
+	VERSION_CHECK_ENABLED,
+} from "./utils/version-check.ts";
 import {
 	cleanupWindowsSelfUpdateQuarantine,
 	quarantineWindowsNativeDependencies,
@@ -1045,7 +1050,9 @@ export async function handlePackageCommand(
 						console.log(chalk.green("Updated packages"));
 					}
 				}
-				if (updateTargetIncludesSelf(target)) {
+				if (updateTargetIncludesSelf(target) && !VERSION_CHECK_ENABLED) {
+					console.log(chalk.dim(`${APP_NAME} self-update is disabled in this build.`));
+				} else if (updateTargetIncludesSelf(target)) {
 					const managedInstallRoot = getActiveManagedInstallRoot();
 					if (managedInstallRoot && options.force) {
 						console.error(

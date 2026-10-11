@@ -116,7 +116,6 @@ import {
 import type { FullscreenExitOutput, TuiMode } from "../../core/settings-manager.ts";
 import { BUILTIN_SLASH_COMMANDS } from "../../core/slash-commands.ts";
 import type { SourceInfo } from "../../core/source-info.ts";
-import { isInstallTelemetryEnabled } from "../../core/telemetry.ts";
 import { withBuiltInRenderers } from "../../core/tools/renderers/index.ts";
 import type { TruncationResult } from "../../core/tools/truncate.ts";
 import { hasTrustRequiringProjectResources, ProjectTrustStore } from "../../core/trust-manager.ts";
@@ -128,12 +127,11 @@ import { extensionForImageMimeType, readClipboardImage } from "../../utils/clipb
 import { parseGitUrl } from "../../utils/git.ts";
 import { ensurePngTranscoder } from "../../utils/image-convert.ts";
 import { getCwdRelativePath } from "../../utils/paths.ts";
-import { getPiUserAgent } from "../../utils/pi-user-agent.ts";
 import { killTrackedDetachedChildren } from "../../utils/shell.ts";
 import { loadAllHighlightLanguages } from "../../utils/syntax-highlight.ts";
 import { ensureTool, type ToolStatus } from "../../utils/tools-manager.ts";
 import { checkForNewPiVersion, type LatestPiRelease } from "../../utils/version-check.ts";
-import { reportBug } from "./bug-report.ts";
+// import { reportBug } from "./bug-report.ts";
 import { createChatViewport } from "./chat-viewport.ts";
 import { ArminComponent } from "./components/armin.ts";
 import { AssistantMessageComponent } from "./components/assistant-message.ts";
@@ -185,7 +183,7 @@ import { editInExternalEditor } from "./external-editor.ts";
 import { refreshModelCatalogs } from "./model-catalog-refresh.ts";
 import { getModelSearchText } from "./model-search.ts";
 import { type BlockedStatus, ProgramStatusReporter } from "./program-status-reporter.ts";
-import { shareSession } from "./session-share.ts";
+// import { shareSession } from "./session-share.ts";
 import {
 	getAvailableThemes,
 	getAvailableThemesWithPaths,
@@ -284,6 +282,9 @@ function isCustomSessionEntry(item: RenderSessionItem): item is Extract<SessionE
 function isCompactionCostNotice(item: RenderSessionItem): item is CompactionCostNotice {
 	return "type" in item && item.type === "compaction_cost";
 }
+
+// Internal build: the startup package update check contacts npm/git, so it is off.
+const STARTUP_PACKAGE_UPDATE_CHECK_ENABLED = false;
 
 function isUsageSessionEntry(item: RenderSessionItem): item is Extract<SessionEntry, { type: "usage" }> {
 	return "type" in item && item.type === "usage";
@@ -1261,7 +1262,8 @@ export class InteractiveMode {
 	}
 
 	private async checkForPackageUpdates(): Promise<string[]> {
-		if (process.env.PI_OFFLINE) {
+		// Internal build: no automatic startup check against npm/git. `pi update` still works.
+		if (!STARTUP_PACKAGE_UPDATE_CHECK_ENABLED || process.env.PI_OFFLINE) {
 			return [];
 		}
 
@@ -1340,39 +1342,18 @@ export class InteractiveMode {
 		const entries = parseChangelog(changelogPath);
 
 		if (!lastVersion) {
-			// Fresh install - record the version, send telemetry, don't show changelog
+			// Fresh install - record the version, don't show changelog
 			this.settingsManager.setLastChangelogVersion(VERSION);
-			this.reportInstallTelemetry(VERSION);
 			return undefined;
 		}
 
 		const newEntries = getNewEntries(entries, lastVersion);
 		if (newEntries.length > 0) {
 			this.settingsManager.setLastChangelogVersion(VERSION);
-			this.reportInstallTelemetry(VERSION);
 			return newEntries.map((e) => normalizeChangelogLinks(e.content, e)).join("\n\n");
 		}
 
 		return undefined;
-	}
-
-	private reportInstallTelemetry(version: string): void {
-		if (process.env.PI_OFFLINE) {
-			return;
-		}
-
-		if (!isInstallTelemetryEnabled(this.settingsManager)) {
-			return;
-		}
-
-		void fetch(`https://pi.dev/api/report-install?version=${encodeURIComponent(version)}`, {
-			headers: {
-				"User-Agent": getPiUserAgent(version),
-			},
-			signal: AbortSignal.timeout(5000),
-		})
-			.then(() => undefined)
-			.catch(() => undefined);
 	}
 
 	private getMarkdownThemeWithSettings(): MarkdownTheme {
@@ -3234,17 +3215,18 @@ export class InteractiveMode {
 				this.editor.setText("");
 				return;
 			}
-			if (text === "/share") {
-				await this.handleShareCommand();
-				this.editor.setText("");
-				return;
-			}
-			if (text === "/bug" || text.startsWith("/bug ")) {
-				const hint = text.slice("/bug".length).trim();
-				this.editor.setText("");
-				await this.handleBugCommand(hint ? hint : undefined);
-				return;
-			}
+			// Internal build: /share (GitHub gist) and /bug (upload to pi.dev) send session data off-network.
+			// if (text === "/share") {
+			// await this.handleShareCommand();
+			// this.editor.setText("");
+			// return;
+			// }
+			// if (text === "/bug" || text.startsWith("/bug ")) {
+			// const hint = text.slice("/bug".length).trim();
+			// this.editor.setText("");
+			// await this.handleBugCommand(hint ? hint : undefined);
+			// return;
+			// }
 			if (text === "/copy") {
 				await this.handleCopyCommand();
 				this.editor.setText("");
@@ -4949,7 +4931,6 @@ export class InteractiveMode {
 					hideThinkingBlock: this.hideThinkingBlock,
 					mermaidRenderingMode: this.settingsManager.getMermaidRenderingMode(),
 					collapseChangelog: this.settingsManager.getCollapseChangelog(),
-					enableInstallTelemetry: this.settingsManager.getEnableInstallTelemetry(),
 					doubleEscapeAction: this.settingsManager.getDoubleEscapeAction(),
 					treeFilterMode: this.settingsManager.getTreeFilterMode(),
 					showHardwareCursor: this.settingsManager.getShowHardwareCursor(),
@@ -5060,9 +5041,6 @@ export class InteractiveMode {
 					},
 					onCollapseChangelogChange: (collapsed) => {
 						this.settingsManager.setCollapseChangelog(collapsed);
-					},
-					onEnableInstallTelemetryChange: (enabled) => {
-						this.settingsManager.setEnableInstallTelemetry(enabled);
 					},
 					onQuietStartupChange: (quiet) => {
 						this.settingsManager.setQuietStartup(quiet);
@@ -6620,31 +6598,31 @@ export class InteractiveMode {
 		}
 	}
 
-	private async handleShareCommand(): Promise<void> {
-		await shareSession({
-			session: this.session,
-			ui: this.ui,
-			editorContainer: this.editorContainer,
-			editor: this.editor,
-			showStatus: (message) => this.showStatus(message),
-			showError: (message) => this.showError(message),
-		});
-	}
+	// private async handleShareCommand(): Promise<void> {
+	// await shareSession({
+	// session: this.session,
+	// ui: this.ui,
+	// editorContainer: this.editorContainer,
+	// editor: this.editor,
+	// showStatus: (message) => this.showStatus(message),
+	// showError: (message) => this.showError(message),
+	// });
+	// }
 
-	private async handleBugCommand(hint: string | undefined): Promise<void> {
-		await reportBug(
-			{
-				session: this.session,
-				ui: this.ui,
-				editorContainer: this.editorContainer,
-				editor: this.editor,
-				keybindings: this.keybindings,
-				showStatus: (message) => this.showStatus(message),
-				showError: (message) => this.showError(message),
-			},
-			hint,
-		);
-	}
+	// private async handleBugCommand(hint: string | undefined): Promise<void> {
+	// await reportBug(
+	// {
+	// session: this.session,
+	// ui: this.ui,
+	// editorContainer: this.editorContainer,
+	// editor: this.editor,
+	// keybindings: this.keybindings,
+	// showStatus: (message) => this.showStatus(message),
+	// showError: (message) => this.showError(message),
+	// },
+	// hint,
+	// );
+	// }
 
 	private async handleCopyCommand(
 		options: { flashConfirmation?: boolean; preferSelection?: boolean } = {},

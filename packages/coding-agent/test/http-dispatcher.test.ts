@@ -158,7 +158,7 @@ describe("http dispatcher", () => {
 		});
 
 		configureHttpDispatcher();
-		await expect(undici.fetch("https://example.invalid")).rejects.toThrow();
+		await expect(undici.fetch("https://localhost")).rejects.toThrow();
 
 		expect(connectSpy).toHaveBeenCalledWith(
 			expect.objectContaining({
@@ -167,5 +167,18 @@ describe("http dispatcher", () => {
 		);
 		expect(connectSpy.mock.calls[0]?.[0]).not.toHaveProperty("autoSelectFamily");
 		expect(net.getDefaultAutoSelectFamilyAttemptTimeout()).toBe(originalAttemptTimeoutMs);
+	});
+
+	it("refuses hosts outside the egress allowlist before connecting", async () => {
+		globalThis.fetch = async () => {
+			throw new Error("Unexpected global fetch");
+		};
+		const connectSpy = vi.spyOn(tls, "connect");
+
+		configureHttpDispatcher();
+		const error = await undici.fetch("https://pi.dev/api/report-install").catch((e: Error) => e);
+
+		expect(String((error as Error).cause ?? error)).toContain("not in egress allowlist");
+		expect(connectSpy).not.toHaveBeenCalled();
 	});
 });

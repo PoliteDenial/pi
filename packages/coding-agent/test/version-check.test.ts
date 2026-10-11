@@ -6,6 +6,7 @@ import {
 	getLatestPiRelease,
 	getLatestPiVersion,
 	isNewerPackageVersion,
+	VERSION_CHECK_ENABLED,
 } from "../src/utils/version-check.ts";
 import { allowNetwork } from "./test-network-env.ts";
 
@@ -34,7 +35,7 @@ describe("version checks", () => {
 		expect(isNewerPackageVersion("0.70.6", "0.70.5")).toBe(true);
 	});
 
-	it("returns only newer versions", async () => {
+	it.skipIf(!VERSION_CHECK_ENABLED)("returns only newer versions", async () => {
 		const fetchMock = vi.fn(async () => Response.json({ version: "1.2.3" }));
 		vi.stubGlobal("fetch", fetchMock);
 
@@ -70,7 +71,7 @@ describe("version checks", () => {
 		expect(fetchMock).toHaveBeenCalledTimes(3);
 	});
 
-	it("keeps automatic version checks to one request", async () => {
+	it.skipIf(!VERSION_CHECK_ENABLED)("keeps automatic version checks to one request", async () => {
 		const fetchMock = vi.fn().mockRejectedValue(new Error("fetch failed"));
 		vi.stubGlobal("fetch", fetchMock);
 

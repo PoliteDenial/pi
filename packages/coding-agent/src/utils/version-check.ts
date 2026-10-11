@@ -2,6 +2,12 @@ import { compare, valid } from "semver";
 import { fetchWithRetry } from "./management-http.ts";
 import { getPiUserAgent } from "./pi-user-agent.ts";
 
+/**
+ * Internal build: self-update and the startup version check are disabled so pi never contacts pi.dev.
+ * To re-enable, point LATEST_VERSION_URL at a corporate release endpoint, add its host to
+ * ALLOWED_HOSTS in core/egress-allowlist.ts, and set this to true.
+ */
+export const VERSION_CHECK_ENABLED = false;
 const LATEST_VERSION_URL = "https://pi.dev/api/latest-version";
 const DEFAULT_VERSION_CHECK_TIMEOUT_MS = 10000;
 
@@ -95,7 +101,7 @@ export async function getLatestPiVersion(
 }
 
 export async function checkForNewPiVersion(currentVersion: string): Promise<LatestPiRelease | undefined> {
-	if (process.env.PI_SKIP_VERSION_CHECK) return undefined;
+	if (!VERSION_CHECK_ENABLED || process.env.PI_SKIP_VERSION_CHECK) return undefined;
 
 	try {
 		const latestRelease = await getLatestPiRelease(currentVersion);
